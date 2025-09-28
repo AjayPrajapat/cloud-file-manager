@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PermissionLevel {
+  OWNER
+  WRITE
+  READ
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  name         String
+  passwordHash String
+  files        File[]
+  folders      FileFolder[]
+  versions     FileVersion[]
+  auditLogs    AuditLog[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model FileFolder {
+  id        String       @id @default(cuid())
+  name      String
+  ownerId   String
+  owner     User         @relation(fields: [ownerId], references: [id])
+  parentId  String?
+  parent    FileFolder?  @relation("FolderToFolder", fields: [parentId], references: [id])
+  children  FileFolder[] @relation("FolderToFolder")
+  files     File[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+model File {
+  id               String         @id @default(cuid())
+  name             String
+  path             String         @unique
+  size             Int
+  mimeType         String
+  tags             String[]
+  ownerId          String
+  owner            User           @relation(fields: [ownerId], references: [id])
+  folderId         String?
+  folder           FileFolder?    @relation(fields: [folderId], references: [id])
+  versions         FileVersion[]
+  currentVersionId String?
+  currentVersion   FileVersion?   @relation("CurrentFileVersion", fields: [currentVersionId], references: [id])
+  sharedLinks      ShareLink[]
+  auditLogs        AuditLog[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+}
+
+model FileVersion {
+  id            String   @id @default(cuid())
+  fileId        String
+  file          File     @relation(fields: [fileId], references: [id])
+  versionNumber Int
+  s3Key         String
+  size          Int
+  createdAt     DateTime @default(now())
+  createdById   String
+  createdBy     User     @relation(fields: [createdById], references: [id])
+  currentFor    File?    @relation("CurrentFileVersion")
+}
+
+model ShareLink {
+  id          String           @id @default(cuid())
+  fileId      String
+  file        File             @relation(fields: [fileId], references: [id])
+  sharedWith  String?
+  permission  PermissionLevel  @default(READ)
+  token       String           @unique
+  expiresAt   DateTime?
+  createdById String
+  createdBy   User             @relation(fields: [createdById], references: [id])
+  createdAt   DateTime         @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  fileId    String?
+  file      File?    @relation(fields: [fileId], references: [id])
+  metadata  Json?
+  createdAt DateTime @default(now())
+}
